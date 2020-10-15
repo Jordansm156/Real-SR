@@ -42,7 +42,7 @@ network_D:
 
 #### path
 path:
-  pretrain_model_G: ../../DF2K.pth #../pretrained_model/RRDB_PSNR_x4.pth
+  pretrain_model_G: 
   strict_load: true
   resume_state: ~
 
