@@ -22,6 +22,8 @@ datasets:
     use_flip: true
     use_rot: true
     color: RGB
+    data_type: img
+    phase: train
 #  val:
 #    name: val
 #    mode: LQGT
