@@ -8,6 +8,12 @@ import models.networks as networks
 import models.lr_scheduler as lr_scheduler
 from .base_model import BaseModel
 from models.modules.loss import GANLoss
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.debug.metrics as met
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+import torch_xla.utils.utils as xu
 
 logger = logging.getLogger('base')
 
@@ -21,18 +27,25 @@ class SRGANModel(BaseModel):
         train_opt = opt['train']
 
         # define networks and load pretrained models
-        self.netG = networks.define_G(opt).to(self.device)
-        if opt['dist']:
-            self.netG = DistributedDataParallel(self.netG, device_ids=[torch.cuda.current_device()])
-        else:
-            self.netG = DataParallel(self.netG)
+        self.netG = networks.define_G(opt) #.to(self.device)
+        
+        #New
+        self.netG = xmp.MpModelWrapper(self.netG)
+        self.netG = self.netG.to(self.device)
+        
+        #if opt['dist']:
+        #    self.netG = DistributedDataParallel(self.netG, device_ids=[torch.cuda.current_device()])
+        #else:
+        #    self.netG = DataParallel(self.netG)
         if self.is_train:
-            self.netD = networks.define_D(opt).to(self.device)
-            if opt['dist']:
-                self.netD = DistributedDataParallel(self.netD,
-                                                    device_ids=[torch.cuda.current_device()])
-            else:
-                self.netD = DataParallel(self.netD)
+            self.netD = networks.define_D(opt) #.to(self.device)
+            #if opt['dist']:
+            #    self.netD = DistributedDataParallel(self.netD,
+            #                                        device_ids=[torch.cuda.current_device()])
+            #else:
+            #    self.netD = DataParallel(self.netD)
+            self.netD = xmp.MpModelWrapper(self.netD)
+            self.netD = self.netD.to(self.device)
 
             self.netG.train()
             self.netD.train()
@@ -68,12 +81,14 @@ class SRGANModel(BaseModel):
                 logger.info('Remove feature loss.')
                 self.cri_fea = None
             if self.cri_fea:  # load VGG perceptual loss
-                self.netF = networks.define_F(opt, use_bn=False).to(self.device)
-                if opt['dist']:
-                    self.netF = DistributedDataParallel(self.netF,
-                                                        device_ids=[torch.cuda.current_device()])
-                else:
-                    self.netF = DataParallel(self.netF)
+                self.netF = networks.define_F(opt, use_bn=False) #.to(self.device)
+                self.netF = xmp.MpModelWrapper(self.netF)
+                self.netF = self.netF.to(self.device)
+                #if opt['dist']:
+                #    self.netF = DistributedDataParallel(self.netF,
+                #                                        device_ids=[torch.cuda.current_device()])
+                #else:
+                #    self.netF = DataParallel(self.netF)
 
             # GD gan loss
             self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
@@ -163,7 +178,8 @@ class SRGANModel(BaseModel):
             l_g_total += l_g_gan
 
             l_g_total.backward()
-            self.optimizer_G.step()
+            #self.optimizer_G.step()
+            xm.optimizer_step(self.optimizer_G)
 
         # D
         for p in self.netD.parameters():
@@ -183,7 +199,8 @@ class SRGANModel(BaseModel):
             l_d_total = (l_d_real + l_d_fake) / 2
 
         l_d_total.backward()
-        self.optimizer_D.step()
+        #self.optimizer_D.step()
+        xm.optimizer_step(self.optimizer_D)
 
         # set log
         if step % self.D_update_ratio == 0 and step > self.D_init_iters:
