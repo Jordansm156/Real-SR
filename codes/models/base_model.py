@@ -3,12 +3,19 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.debug.metrics as met
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+import torch_xla.utils.utils as xu
 
 
 class BaseModel():
     def __init__(self, opt):
         self.opt = opt
-        self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
+        #self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
+        self.device = xm.xla_device()
         self.is_train = opt['is_train']
         self.schedulers = []
         self.optimizers = []
