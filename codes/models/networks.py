@@ -5,6 +5,12 @@ import models.modules.SRResNet_arch as SRResNet_arch
 import models.modules.discriminator_vgg_arch as SRGAN_arch
 import models.modules.RRDBNet_arch as RRDBNet_arch
 logger = logging.getLogger('base')
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.debug.metrics as met
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+import torch_xla.utils.utils as xu
 
 
 class ResidualBlock(nn.Module):
@@ -86,7 +92,8 @@ def define_D(opt):
 #### Define Network used for Perceptual Loss
 def define_F(opt, use_bn=False):
     gpu_ids = opt['gpu_ids']
-    device = torch.device('cuda' if gpu_ids else 'cpu')
+    #device = torch.device('cuda' if gpu_ids else 'cpu')
+    device = xm.xla_device()
     # PyTorch pretrained VGG19-54, before ReLU.
     if use_bn:
         feature_layer = 49
