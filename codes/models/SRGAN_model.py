@@ -25,6 +25,8 @@ class SRGANModel(BaseModel):
         else:
             self.rank = -1  # non dist training
         train_opt = opt['train']
+        
+        self.device = xm.xla_device()
 
         # define networks and load pretrained models
         self.netG = networks.define_G(opt) #.to(self.device)
